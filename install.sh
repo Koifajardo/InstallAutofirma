@@ -40,6 +40,15 @@ command -v python3  >/dev/null 2>&1 || { err "python3 no está instalado"; exit 
 command -v jq       >/dev/null 2>&1 || warn "jq no está instalado (algunas comprobaciones del README fallarán)"
 ok "Pre-requisitos OK"
 
+# Zen NO debe estar corriendo: mantiene cert9.db en memoria y lo sobreescribe
+# al cerrarse, borrando el CA que instale este script (Paso 9).
+if pgrep -x zen >/dev/null 2>&1; then
+    err "Zen Browser está corriendo. Ciérralo antes de ejecutar este script,"
+    err "si no el CA instalado en cert9.db se perderá al cerrarse Zen."
+    err "   Ciérralo con:  flatpak kill app.zen_browser.zen  (o pkill -x zen)"
+    exit 1
+fi
+
 # ── PASO 1: Instalar Flatpaks ────────────────────────────────────
 log "Paso 1: Instalación de Flatpaks (AutoFirma y Zen Browser)"
 if ! flatpak list 2>/dev/null | grep -qi "$AFIRMA_APP"; then
@@ -139,15 +148,15 @@ cat > "$ZEN_PROFILE/distribution/policies.json" << EOF
 EOF
 ok "policies.json generado en el perfil"
 
-# ── PASO 8: Parchear handlers.json (afirma:// → action 3) ──────
+# ── PASO 8: Parchear handlers.json (afirma:// → stubEntry) ─────
 log "Paso 8: Parchear handlers.json"
 if [ -f "$ZEN_PROFILE/handlers.json" ]; then
     python3 "$SCRIPT_DIR/handlers.json.patch.py" "$ZEN_PROFILE/handlers.json"
 else
-    # Crear handlers.json mínimo si no existe
+    # Crear handlers.json mínimo si no existe (formato stubEntry, NO action)
     python3 -c "
 import json, os
-d = {'defaultHandlersVersion': {}, 'mimeTypes': {}, 'schemes': {'afirma': {'action': 3}}}
+d = {'defaultHandlersVersion': {}, 'mimeTypes': {}, 'schemes': {'afirma': {'stubEntry': True}}}
 with open('$ZEN_PROFILE/handlers.json', 'w') as f:
     json.dump(d, f)
 "

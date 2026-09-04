@@ -2,8 +2,14 @@
 """
 Parche para handlers.json de Firefox/Zen Browser.
 
-Cambia la acción del protocolo `afirma` a `action: 3` (usar el handler por
-defecto del sistema), para que Firefox/Zen abra AutoFirma vía xdg-open.
+Configura el protocolo `afirma` como esquema delegado al handler del
+sistema usando el formato `stubEntry` (igual que `mailto`).
+
+IMPORTANTE (sep 2026): el formato `{"action": 3}` que se usaba antes
+funcionaba en Zen 1.21.8b, pero en Zen >= 1.21.16b (base Firefox nueva)
+un valor de `action` en un esquema produce un FALLO SILENCIOSO: el
+navegador no lanza AutoFirma y no muestra diálogo ni error. El formato
+correcto es `{"stubEntry": true}`.
 
 Uso:
     python3 handlers.json.patch.py /ruta/al/handlers.json
@@ -20,7 +26,7 @@ def patch(path: str) -> int:
         data = {
             "defaultHandlersVersion": {},
             "mimeTypes": {},
-            "schemes": {"afirma": {"action": 3}},
+            "schemes": {"afirma": {"stubEntry": True}},
         }
         with open(path, "w") as f:
             json.dump(data, f)
@@ -36,17 +42,16 @@ def patch(path: str) -> int:
 
     schemes = data.setdefault("schemes", {})
     afirma = schemes.get("afirma", {})
-    if afirma.get("action") == 3:
-        print("[INFO] afirma:// ya estaba en action=3. Sin cambios.")
+    if afirma.get("stubEntry") is True and "action" not in afirma:
+        print("[INFO] afirma:// ya estaba en stubEntry. Sin cambios.")
         return 0
 
-    afirma["action"] = 3
-    afirma.pop("ask", None)  # quitar flag ask:true si existía
-    schemes["afirma"] = afirma
+    # Formato nuevo: stubEntry (delegado al sistema), sin "action" ni "ask"
+    schemes["afirma"] = {"stubEntry": True}
 
     with open(path, "w") as f:
         json.dump(data, f, indent=None, separators=(",", ":"))
-    print(f"[ OK ] handlers.json parcheado: afirma:// -> action=3 en {path}")
+    print(f"[ OK ] handlers.json parcheado: afirma:// -> stubEntry en {path}")
     return 0
 
 

@@ -30,7 +30,7 @@ Esta guía/script soluciona todo esto.
 | `README.md`                      | Este documento                                                         |
 | `install.sh`                     | Script principal. Hace toda la instalación/configuración.              |
 | `prefs.js`                       | Preferencias de Zen que se copian al perfil como `user.js`.            |
-| `handlers.json.patch.py`         | Parche Python que cambia `afirma` a `action: 3` en el perfil de Zen.   |
+| `handlers.json.patch.py`         | Parche Python que cambia `afirma` a `stubEntry` en el perfil de Zen.   |
 | `policies.json.tmpl`             | Plantilla de políticas de Firefox (con `@HOME@` como placeholder).    |
 
 > AutoFirma generará automáticamente `~/.afirma/Autofirma/Autofirma_ROOT.cer` la primera vez que se arranque; ese fichero **no** se distribuye en este repositorio (es específico de cada máquina/usuario).
@@ -154,19 +154,22 @@ Esto fuerza a Zen a instalar el CA en su cert9.db al arrancar.
 
 ### 8. Configura el protocolo `afirma://` en Zen
 
-Modifica `<profile>/handlers.json` cambiando:
+Modifica `<profile>/handlers.json` cambiando la entrada de `afirma` (si existe, con `action: 4` u otro valor) por:
 
 ```json
-"afirma": {"action": 4}
+"afirma": {"stubEntry": true}
 ```
 
-por:
+`stubEntry` (el mismo formato que usa `mailto`) delega el esquema al handler por defecto del sistema (`es.gob.afirma.desktop`, lanzado vía portal/xdg-open).
 
-```json
-"afirma": {"action": 3}
-```
-
-`action: 3` significa "usar el handler por defecto del sistema" (que ya está registrado como `es.gob.afirma.desktop`).
+> ⚠️ **IMPORTANTE (sep 2026):** la versión original de esta guía usaba
+> `{"action": 3}`. Ese formato funcionaba en Zen 1.21.8b, pero **en
+> Zen >= 1.21.16b (base Firefox nueva) un valor `action` en un esquema
+> produce un fallo silencioso**: el navegador no lanza AutoFirma, no
+> muestra diálogo ni error, y la web muestra "No se ha podido conectar
+> con AutoFirma" (reintentando WebSockets en puertos viejos para
+> siempre). El formato correcto es `stubEntry`, y la pref
+> `network.protocol-handler.expose.afirma` debe quedar en `true`.
 
 ### 9. Instala el CA en el cert9.db del perfil de Zen
 
@@ -286,7 +289,7 @@ Si prefieres no usar el script y hacerlo a mano:
    sed -i "s|@HOME@|$HOME|g" "$PROFILE/distribution/policies.json"
    ```
 
-9. Aplica el parche `afirma:// action:3` en `handlers.json`:
+9. Aplica el parche `afirma:// stubEntry` en `handlers.json`:
    ```bash
    python3 handlers.json.patch.py "$PROFILE/handlers.json"
    ```
@@ -396,9 +399,14 @@ PROFILE="$(find ~/.var/app/app.zen_browser.zen/.zen -maxdepth 1 \
 python3 -c "import json;d=json.load(open('$PROFILE/handlers.json'));print(d['schemes']['afirma'])"
 ```
 
-Debe salir `{'action': 3}`.
+Debe salir `{'stubEntry': True}`.
 
 ## Notas / Advertencias
+
+- **Zen debe estar CERRADO al ejecutar `install.sh`** (el script ahora lo
+  comprueba y aborta). Zen mantiene `cert9.db` en memoria y lo reescribe al
+  cerrarse: si instalas el CA con Zen abierto, lo pierdes silenciosamente al
+  salir y la conexión WSS falla ("No se ha podido conectar con AutoFirma").
 
 - **No uses `/tmp`** como directorio intermedio entre el Flatpak de AutoFirma y el host. El `/tmp` dentro del sandbox de un Flatpak es **privado y efímero**. Usa siempre un subdirectorio dentro de `$HOME` (por ejemplo `~/.cache/afirma-install-work/`).
 - **Cada vez que regeneres la configuración de AutoFirma** (por ejemplo al reinstalar el Flatpak o borrar `~/.afirma/`), el `autofirma.pfx` y `Autofirma_ROOT.cer` se regeneran con nuevos hashes. Repite el script para reinstalar el CA en el trust store y en el perfil de Zen.

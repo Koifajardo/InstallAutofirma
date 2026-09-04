@@ -7,5 +7,5 @@
 
 user_pref("network.protocol-handler.external.afirma", true);   // Permitir handler externo
 user_pref("network.protocol-handler.warn-external.afirma", false); // No preguntar al usuario
-user_pref("network.protocol-handler.expose.afirma", false);    // No gestionar internamente (delegate to OS)
+user_pref("network.protocol-handler.expose.afirma", true);     // Exponer el esquema al sistema de handlers (con stubEntry en handlers.json)
 user_pref("security.enterprise_roots.enabled", true);          // Importar CA del sistema (incluye Autofirma ROOT)
